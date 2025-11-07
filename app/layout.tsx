@@ -3,13 +3,6 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import { CartProvider } from '@/lib/cart-context';
 import { Toaster } from '@/components/ui/sonner';
-import { Instrument_Sans } from 'next/font/google';
-
-const instrumentSans = Instrument_Sans({
-  subsets: ['latin'],
-  variable: '--font-instrument-sans',
-});
-
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -25,7 +18,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={`${inter.className} ${instrumentSans.variable} font-sans`}>
+      <body className={inter.className}>
         <CartProvider>
           {children}
           <Toaster />
