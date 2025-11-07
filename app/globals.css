@@ -1,0 +1,168 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground-rgb: 0, 0, 0;
+  --background-start-rgb: 214, 219, 220;
+  --background-end-rgb: 255, 255, 255;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --foreground-rgb: 255, 255, 255;
+    --background-start-rgb: 0, 0, 0;
+    --background-end-rgb: 0, 0, 0;
+  }
+}
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 20%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 20%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 20%;
+    --primary: 0 65% 45%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 96%;
+    --secondary-foreground: 0 0% 20%;
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 45%;
+    --accent: 0 65% 45%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 89.8%;
+    --input: 0 0% 89.8%;
+    --ring: 0 65% 45%;
+    --chart-1: 0 65% 45%;
+    --chart-2: 0 55% 55%;
+    --chart-3: 0 45% 35%;
+    --chart-4: 0 60% 50%;
+    --chart-5: 0 50% 40%;
+    --radius: 0rem;
+  }
+  .dark {
+    --background: 0 0% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 0 0% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 0 0% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 0 0% 9%;
+    --secondary: 0 0% 14.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 0 0% 14.9%;
+    --muted-foreground: 0 0% 63.9%;
+    --accent: 0 0% 14.9%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 14.9%;
+    --input: 0 0% 14.9%;
+    --ring: 0 0% 83.1%;
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@layer components {
+  .container-custom {
+    @apply max-w-7xl mx-auto px-6 sm:px-8 lg:px-12;
+  }
+
+  .btn-primary {
+    @apply bg-[#8B2635] hover:bg-[#6d1e29] text-white font-medium py-2.5 px-6 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed uppercase text-sm tracking-wide;
+  }
+
+  .btn-secondary {
+    @apply bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium py-2.5 px-6 transition-all duration-200 uppercase text-sm tracking-wide;
+  }
+
+  .btn-outline {
+    @apply border-2 border-[#8B2635] text-[#8B2635] hover:bg-[#8B2635] hover:text-white font-medium py-2.5 px-6 transition-all duration-200 uppercase text-sm tracking-wide;
+  }
+
+  .card-custom {
+    @apply bg-white shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden;
+  }
+
+  .input-custom {
+    @apply w-full px-4 py-2.5 border border-gray-300 focus:outline-none focus:ring-1 focus:ring-[#8B2635] focus:border-[#8B2635] bg-white text-sm;
+  }
+
+  .badge-status {
+    @apply px-3 py-1 rounded-full text-sm font-medium;
+  }
+
+  .badge-pending {
+    @apply badge-status bg-amber-100 text-amber-800;
+  }
+
+  .badge-accepted {
+    @apply badge-status bg-blue-100 text-blue-800;
+  }
+
+  .badge-ready {
+    @apply badge-status bg-green-100 text-green-800;
+  }
+
+  .badge-picked-up {
+    @apply badge-status bg-gray-100 text-gray-800;
+  }
+
+  .badge-cancelled {
+    @apply badge-status bg-red-100 text-red-800;
+  }
+
+  .pizza-grid {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6;
+  }
+
+  .section-title {
+    @apply text-4xl font-light text-gray-800 mb-3 text-center;
+  }
+
+  .section-subtitle {
+    @apply text-base text-gray-600 mb-12 text-center max-w-3xl mx-auto leading-relaxed;
+  }
+
+  .page-header {
+    @apply bg-[#8B2635] text-white py-12;
+  }
+
+  .hero-section {
+    @apply relative bg-cover bg-center bg-no-repeat h-[500px] flex items-center justify-center;
+  }
+
+  .hero-overlay {
+    @apply absolute inset-0 bg-black bg-opacity-20;
+  }
+
+  .hero-content {
+    @apply relative z-10 text-center text-white;
+  }
+}
+.accent-text {
+    color: #C44536;
+    font-style: italic;
+    font-family: "Instrument Serif", serif;
+}
+p, span, a, li, label, input, button, textarea, small, div {
+    font-family: "Instrument Sans", sans-serif;
+}
