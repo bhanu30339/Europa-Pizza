@@ -1,532 +1,390 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import { Navbar } from '@/components/Navbar';
 import { Footer } from '@/components/Footer';
-import { Cart } from '@/components/Cart';
 import { useCart } from '@/lib/cart-context';
-import { Pizza } from '@/lib/supabase';
-import { toast } from 'sonner';
-import { Minus, Plus } from 'lucide-react';
+import { Minus, Plus, Trash2 } from 'lucide-react';
 
-function CheckoutForm({ formData, setFormData, errors, setErrors, validateForm, total, cart, clearCart, appliedCoupon }: any) {
-  const router = useRouter();
-  const [loading, setLoading] = useState(false);
+type PizzaSize = { name: string; price: number };
+type Pizza = {
+  id: string;
+  name: string;
+  description: string;
+  image_url: string;
+  base_price: number;
+  sizes: PizzaSize[];
+  is_vegetarian?: boolean;
+};
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+export default function CheckoutPage() {
+  const { cart, updateQuantity, removeFromCart, cartTotal } = useCart();
 
-    if (cart.length === 0) {
-      toast.error('Your cart is empty');
-      return;
-    }
-
-    if (!validateForm()) {
-      toast.error('Please fill in all required fields correctly');
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      const orderItems = cart.map((item: any) => ({
-        pizza_id: item.pizza.id,
-        name: item.pizza.name,
-        quantity: item.quantity,
-        price: item.totalPrice / item.quantity,
-        size: item.size,
-        customizations: item.selectedToppings?.map((t: any) => ({
-          topping_id: t.id,
-          topping_name: t.name,
-          topping_price: t.price,
-        })) || [],
-        removed_toppings: item.removedToppings || [],
-        comments: item.comments || '',
-      }));
-
-      const deliveryFee = formData.shippingMethod === 'delivery' ? 5.00 : 0;
-      const totalAmount = total;
-
-      const response = await fetch('/api/orders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          customer_name: formData.fullName,
-          customer_email: formData.email,
-          customer_phone: formData.phone,
-          shipping_method: formData.shippingMethod,
-          delivery_address: formData.shippingMethod === 'delivery'
-            ? `${formData.streetName}, ${formData.suburb}, ${formData.pinCode}`
-            : null,
-          delivery_date: formData.deliveryDate,
-          delivery_time: formData.deliveryTime,
-          payment_method: formData.paymentMethod,
-          coupon_code: appliedCoupon?.code || null,
-          items: orderItems,
-          total_amount: totalAmount,
-          payment_status: 'pending',
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        toast.error(data.error || 'Failed to create order');
-        setLoading(false);
-        return;
+  // ------- fetch “People also ordered” -------
+  const [suggestions, setSuggestions] = useState<Pizza[]>([]);
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch('/api/menu');
+        const data = await res.json();
+        const all: Pizza[] = data?.pizzas ?? [];
+        setSuggestions(all.slice(0, 6));
+      } catch (e) {
+        console.error(e);
       }
+    })();
+  }, []);
 
-      clearCart();
-      toast.success('Order placed successfully!');
-      router.push(`/order-success?order_id=${data.order.id}`);
+  // ------- delivery/pickup + fees -------
+  const [method, setMethod] = useState<'delivery' | 'pickup'>('delivery');
+  const deliveryFee = 5.0;
+  const pickupFee = 0.0;
+  const handlingFee = 1.5;
+  const cardSurcharge = 5.5;
 
-    } catch (error) {
-      console.error('Checkout error:', error);
-      toast.error('Failed to process order');
-      setLoading(false);
+  // ------- coupon (simple local demo) -------
+  const [coupon, setCoupon] = useState('');
+  const [couponMsg, setCouponMsg] = useState<'idle' | 'applied' | 'invalid'>('idle');
+  const [discount, setDiscount] = useState(0);
+
+  const applyCoupon = () => {
+    // Demo: CHEESE20 gives $2.00 off
+    if (coupon.trim().toUpperCase() === 'CHEESE20') {
+      setDiscount(2.0);
+      setCouponMsg('applied');
+    } else {
+      setDiscount(0);
+      setCouponMsg('invalid');
     }
   };
 
-  return (
-    <form onSubmit={handleSubmit}>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-8">
-          <div>
-            <h2 className="text-2xl font-semibold mb-6">Personal Details</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Full Name
-                </label>
-                <input
-                  type="text"
-                  value={formData.fullName}
-                  onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                  className={`w-full px-4 py-3 border ${errors.fullName ? 'border-red-500' : 'border-gray-300'} focus:outline-none focus:ring-2 focus:ring-[#8B2635] focus:border-transparent rounded`}
-                  placeholder="Enter your full name"
-                />
-                {errors.fullName && (
-                  <p className="text-red-500 text-xs mt-1">{errors.fullName}</p>
-                )}
-              </div>
+  const subTotal = cartTotal;
+  const shipFee = method === 'delivery' ? deliveryFee : pickupFee;
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Phone
-                </label>
-                <input
-                  type="tel"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  className={`w-full px-4 py-3 border ${errors.phone ? 'border-red-500' : 'border-gray-300'} focus:outline-none focus:ring-2 focus:ring-[#8B2635] focus:border-transparent rounded`}
-                  placeholder="Enter your phone number"
-                />
-                {errors.phone && (
-                  <p className="text-red-500 text-xs mt-1">{errors.phone}</p>
-                )}
-              </div>
-            </div>
+  const grandTotal = useMemo(() => {
+    const raw = subTotal + shipFee + handlingFee + cardSurcharge - discount;
+    return raw < 0 ? 0 : raw;
+  }, [subTotal, shipFee, discount]);
 
-            <div className="mt-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Email
-              </label>
-              <input
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className={`w-full px-4 py-3 border ${errors.email ? 'border-red-500' : 'border-gray-300'} focus:outline-none focus:ring-2 focus:ring-[#8B2635] focus:border-transparent rounded`}
-                placeholder="Enter your email"
-              />
-              {errors.email && (
-                <p className="text-red-500 text-xs mt-1">{errors.email}</p>
-              )}
-            </div>
-          </div>
-
-          <div>
-            <h2 className="text-2xl font-semibold mb-6">Delivery Details</h2>
-
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Shipping Method
-              </label>
-              <div className="flex gap-4">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="shippingMethod"
-                    value="delivery"
-                    checked={formData.shippingMethod === 'delivery'}
-                    onChange={(e) => setFormData({ ...formData, shippingMethod: e.target.value })}
-                    className="w-4 h-4 text-[#8B2635]"
-                  />
-                  <span className="text-sm">Delivery $5.00 AUD</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="shippingMethod"
-                    value="pickup"
-                    checked={formData.shippingMethod === 'pickup'}
-                    onChange={(e) => setFormData({ ...formData, shippingMethod: e.target.value })}
-                    className="w-4 h-4 text-[#8B2635]"
-                  />
-                  <span className="text-sm">Pickup $0.00 AUD</span>
-                </label>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Delivery Date
-                </label>
-                <input
-                  type="date"
-                  value={formData.deliveryDate}
-                  onChange={(e) => setFormData({ ...formData, deliveryDate: e.target.value })}
-                  min={new Date().toISOString().split('T')[0]}
-                  className={`w-full px-4 py-3 border ${errors.deliveryDate ? 'border-red-500' : 'border-gray-300'} focus:outline-none focus:ring-2 focus:ring-[#8B2635] focus:border-transparent rounded`}
-                />
-                {errors.deliveryDate && (
-                  <p className="text-red-500 text-xs mt-1">{errors.deliveryDate}</p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Delivery Time
-                </label>
-                <input
-                  type="time"
-                  value={formData.deliveryTime}
-                  onChange={(e) => setFormData({ ...formData, deliveryTime: e.target.value })}
-                  className={`w-full px-4 py-3 border ${errors.deliveryTime ? 'border-red-500' : 'border-gray-300'} focus:outline-none focus:ring-2 focus:ring-[#8B2635] focus:border-transparent rounded`}
-                />
-                {errors.deliveryTime && (
-                  <p className="text-red-500 text-xs mt-1">{errors.deliveryTime}</p>
-                )}
-              </div>
-            </div>
-
-            {formData.shippingMethod === 'delivery' && (
-              <div>
-                <h3 className="font-semibold mb-4">Address</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Street Name
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.streetName}
-                      onChange={(e) => setFormData({ ...formData, streetName: e.target.value })}
-                      className={`w-full px-4 py-3 border ${errors.streetName ? 'border-red-500' : 'border-gray-300'} focus:outline-none focus:ring-2 focus:ring-[#8B2635] focus:border-transparent rounded`}
-                      placeholder="Enter street name"
-                    />
-                    {errors.streetName && (
-                      <p className="text-red-500 text-xs mt-1">{errors.streetName}</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Suburb
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.suburb}
-                      onChange={(e) => setFormData({ ...formData, suburb: e.target.value })}
-                      className={`w-full px-4 py-3 border ${errors.suburb ? 'border-red-500' : 'border-gray-300'} focus:outline-none focus:ring-2 focus:ring-[#8B2635] focus:border-transparent rounded`}
-                      placeholder="Enter suburb"
-                    />
-                    {errors.suburb && (
-                      <p className="text-red-500 text-xs mt-1">{errors.suburb}</p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="mt-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Pin Code
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.pinCode}
-                    onChange={(e) => setFormData({ ...formData, pinCode: e.target.value })}
-                    className={`w-full px-4 py-3 border ${errors.pinCode ? 'border-red-500' : 'border-gray-300'} focus:outline-none focus:ring-2 focus:ring-[#8B2635] focus:border-transparent rounded`}
-                    placeholder="Enter pin code"
-                  />
-                  {errors.pinCode && (
-                    <p className="text-red-500 text-xs mt-1">{errors.pinCode}</p>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div>
-            <h2 className="text-2xl font-semibold mb-6">Payment</h2>
-            <div className="bg-white border border-gray-200 p-6 rounded">
-              <div className="mb-4">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="paymentMethod"
-                    value="card"
-                    checked={formData.paymentMethod === 'card'}
-                    onChange={(e) => setFormData({ ...formData, paymentMethod: e.target.value })}
-                    className="w-4 h-4 text-[#8B2635]"
-                  />
-                  <span className="text-sm">Credit / Debit Card (Pay on Delivery)</span>
-                </label>
-              </div>
-              <p className="text-xs text-gray-500">Payment will be collected upon delivery.</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="lg:col-span-1">
-          <div className="sticky top-24">
-            <Cart
-              showCoupon={true}
-              appliedCoupon={appliedCoupon}
-              onApplyCoupon={async () => {}}
-              checkoutButtonText={loading ? 'Processing...' : 'Place Order'}
-              onCheckout={() => {
-                const form = document.querySelector('form');
-                if (form) {
-                  form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
-                }
-              }}
-            />
-          </div>
-        </div>
-      </div>
-    </form>
-  );
-}
-
-export default function CheckoutPage() {
-  const router = useRouter();
-  const { cart, cartTotal, clearCart, addToCart } = useCart();
-  const [suggestedPizzas, setSuggestedPizzas] = useState<Pizza[]>([]);
-  const [suggestedQuantities, setSuggestedQuantities] = useState<{[key: string]: number}>({});
-  const [appliedCoupon, setAppliedCoupon] = useState<{code: string; discount: number} | null>(null);
-  const [formData, setFormData] = useState({
+  // ------- simple controlled form fields (no submit wiring) -------
+  const [form, setForm] = useState({
     fullName: '',
     phone: '',
     email: '',
-    shippingMethod: 'delivery',
-    deliveryDate: '',
-    deliveryTime: '',
-    streetName: '',
+    date: '',
+    time: '',
+    instructions: '',
+    street: '',
     suburb: '',
-    pinCode: '',
-    paymentMethod: 'card',
+    streetNo: '',
+    suburb2: '',
+    payment: 'card', // radio
   });
-  const [errors, setErrors] = useState<{[key: string]: string}>({});
 
-  const deliveryFee = formData.shippingMethod === 'delivery' ? 5.00 : 0;
-  const total = cartTotal + deliveryFee + 2.00 + 1.50 + 0.50 - (appliedCoupon?.discount || 0);
-
-  useEffect(() => {
-    if (cart.length === 0) {
-      router.push('/menu');
-    }
-  }, [cart.length, router]);
-
-  useEffect(() => {
-    async function fetchSuggestions() {
-      try {
-        const response = await fetch('/api/menu');
-        const data = await response.json();
-
-        if (data.pizzas) {
-          const cartCategoryIds = cart.map((item: any) => item.pizza.category_id).filter(Boolean);
-          const cartPizzaIds = new Set(cart.map((item: any) => item.pizza.id));
-
-          let popularPizzas = data.pizzas.filter((p: Pizza) =>
-            p.is_popular && p.is_available && !cartPizzaIds.has(p.id)
-          );
-
-          const sameCategoryPizzas = data.pizzas.filter((p: Pizza) =>
-            cartCategoryIds.includes(p.category_id) &&
-            p.is_available &&
-            !cartPizzaIds.has(p.id) &&
-            !p.is_popular
-          );
-
-          const otherPizzas = data.pizzas.filter((p: Pizza) =>
-            !cartCategoryIds.includes(p.category_id) &&
-            p.is_available &&
-            !cartPizzaIds.has(p.id) &&
-            !p.is_popular
-          );
-
-          const mixedSuggestions = [
-            ...popularPizzas.slice(0, 2),
-            ...sameCategoryPizzas.slice(0, 2),
-            ...otherPizzas.slice(0, 2),
-          ].slice(0, 6);
-
-          setSuggestedPizzas(mixedSuggestions);
-
-          const initialQuantities: {[key: string]: number} = {};
-          mixedSuggestions.forEach(p => {
-            initialQuantities[p.id] = 1;
-          });
-          setSuggestedQuantities(initialQuantities);
-        }
-      } catch (error) {
-        console.error('Failed to fetch suggestions:', error);
-      }
-    }
-
-    if (cart.length > 0) {
-      fetchSuggestions();
-    }
-  }, [cart]);
-
-  const updateSuggestedQuantity = (pizzaId: string, delta: number) => {
-    setSuggestedQuantities(prev => ({
-      ...prev,
-      [pizzaId]: Math.max(1, (prev[pizzaId] || 1) + delta)
-    }));
-  };
-
-  const addSuggestedToCart = (pizza: Pizza) => {
-    const quantity = suggestedQuantities[pizza.id] || 1;
-    const defaultSize = pizza.sizes && pizza.sizes.length > 0 ? pizza.sizes[0].name : 'Medium';
-    addToCart(pizza, defaultSize, quantity, [], [], '');
-    toast.success(`Added ${pizza.name} to cart!`);
-  };
-
-  const handleApplyCoupon = async (code: string) => {
-    try {
-      const response = await fetch(`/api/coupons/validate?code=${code}&amount=${cartTotal}`);
-      const data = await response.json();
-
-      if (!response.ok) {
-        toast.error(data.error || 'Invalid coupon code');
-        return;
-      }
-
-      setAppliedCoupon({
-        code: data.code,
-        discount: data.discount
-      });
-      toast.success('Coupon applied successfully!');
-    } catch (error) {
-      toast.error('Failed to apply coupon');
-    }
-  };
-
-  const validateForm = () => {
-    const newErrors: {[key: string]: string} = {};
-
-    if (!formData.fullName.trim()) newErrors.fullName = 'Full name is required';
-    if (!formData.phone.trim()) {
-      newErrors.phone = 'Phone number is required';
-    } else if (!/^\d{10}$/.test(formData.phone.replace(/\D/g, ''))) {
-      newErrors.phone = 'Please enter a valid 10-digit phone number';
-    }
-    if (!formData.email.trim()) {
-      newErrors.email = 'Email is required';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = 'Please enter a valid email address';
-    }
-    if (!formData.deliveryDate) newErrors.deliveryDate = 'Delivery date is required';
-    if (!formData.deliveryTime) newErrors.deliveryTime = 'Delivery time is required';
-
-    if (formData.shippingMethod === 'delivery') {
-      if (!formData.streetName.trim()) newErrors.streetName = 'Street name is required';
-      if (!formData.suburb.trim()) newErrors.suburb = 'Suburb is required';
-      if (!formData.pinCode.trim()) {
-        newErrors.pinCode = 'Pin code is required';
-      } else if (!/^\d{4,6}$/.test(formData.pinCode)) {
-        newErrors.pinCode = 'Please enter a valid pin code';
-      }
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  if (cart.length === 0) {
-    return null;
-  }
+  const setField =
+    (k: keyof typeof form) =>
+    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+      setForm((s) => ({ ...s, [k]: e.target.value }));
 
   return (
     <>
       <Navbar />
 
-      <div className="min-h-screen bg-white pt-24 pb-20">
-        <div className="max-w-7xl mx-auto px-4">
-          <h1 className="text-4xl font-light mb-8">Checkout</h1>
+      <main className="bg-white min-h-screen pt-24 pb-16">
+        <div className="container mx-auto max-w-6xl px-5">
+          {/* Heading */}
+          <h1 className="text-[64px] font-normal font-['Instrument_Serif'] text-[#2E2E2E] mb-6">
+            Checkout
+          </h1>
 
-          {suggestedPizzas.length > 0 && (
-            <div className="mb-12">
-              <h2 className="text-2xl font-semibold mb-6">People also ordered</h2>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                {suggestedPizzas.map((pizza) => (
-                  <div key={pizza.id} className="border border-gray-200">
-                    <div className="relative h-32">
-                      <Image
-                        src={pizza.image_url}
-                        alt={pizza.name}
-                        fill
-                        className="object-cover"
-                      />
-                    </div>
-                    <div className="p-3">
-                      <p className="text-sm font-medium mb-2 truncate">{pizza.name}</p>
-                      <p className="text-[#8B2635] font-semibold mb-2">${pizza.base_price}</p>
-                      <div className="flex items-center gap-2">
+          {/* People also ordered */}
+          <section className="mb-8">
+            <h3 className="text-[16px] font-semibold text-[#2E2E2E] mb-3 font-['Inter']">
+              People also Ordered
+            </h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-6">
+              {suggestions.map((p) => (
+                <div key={p.id} className="font-['Inter']">
+                  <div className="relative aspect-[1/1] w-full border border-[#e8e8e8]">
+                    <Image src={p.image_url} alt={p.name} fill className="object-cover" />
+                  </div>
+                  <p className="mt-2 text-[12px] text-[#2E2E2E] line-clamp-2">{p.name}</p>
+                  <p className="text-[12px] text-[#B83439]">${p.base_price.toFixed(2)}</p>
+                  <div className="mt-1 flex items-center gap-2">
+                    <button className="h-7 w-7 border text-sm grid place-items-center">-</button>
+                    <span className="text-sm">1</span>
+                    <button className="h-7 w-7 border text-sm grid place-items-center">+</button>
+                    <button className="ml-auto px-3 h-7 border text-sm">Add</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* Two columns: left form / right cart */}
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-10">
+            {/* LEFT FORM */}
+            <div className="font-['Inter'] text-[#2E2E2E]">
+              {/* Personal Details */}
+              <h4 className="text-[18px] font-semibold mb-3">Personal Details</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className="text-xs block mb-2">Full Name</label>
+                  <input
+                    value={form.fullName}
+                    onChange={setField('fullName')}
+                    className="w-full border border-[#dadada] px-3 py-2 outline-none focus:ring-1 focus:ring-[#B83439]"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs block mb-2">Phone Number</label>
+                  <input
+                    value={form.phone}
+                    onChange={setField('phone')}
+                    className="w-full border border-[#dadada] px-3 py-2 outline-none focus:ring-1 focus:ring-[#B83439]"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="text-xs block mb-2">Email</label>
+                  <input
+                    value={form.email}
+                    onChange={setField('email')}
+                    className="w-full border border-[#dadada] px-3 py-2 outline-none focus:ring-1 focus:ring-[#B83439]"
+                  />
+                </div>
+              </div>
+
+              {/* Delivery Details */}
+              <h4 className="text-[18px] font-semibold mt-6 mb-3">Delivery Details</h4>
+
+              <div className="flex items-center gap-6 mb-4">
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="radio"
+                    name="ship"
+                    checked={method === 'delivery'}
+                    onChange={() => setMethod('delivery')}
+                  />
+                  Delivery <span className="text-xs text-[#777]">( ${deliveryFee.toFixed(2)} )</span>
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="radio"
+                    name="ship"
+                    checked={method === 'pickup'}
+                    onChange={() => setMethod('pickup')}
+                  />
+                  Pickup <span className="text-xs text-[#777]">( ${pickupFee.toFixed(2)} )</span>
+                </label>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className="text-xs block mb-2">Delivery Date</label>
+                  <input
+                    type="date"
+                    value={form.date}
+                    onChange={setField('date')}
+                    className="w-full border border-[#dadada] px-3 py-2 outline-none focus:ring-1 focus:ring-[#B83439]"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs block mb-2">Delivery Time</label>
+                  <input
+                    type="time"
+                    value={form.time}
+                    onChange={setField('time')}
+                    className="w-full border border-[#dadada] px-3 py-2 outline-none focus:ring-1 focus:ring-[#B83439]"
+                  />
+                </div>
+              </div>
+
+              <div className="mb-6">
+                <label className="text-xs block mb-2">Delivery Instructions</label>
+                <textarea
+                  rows={3}
+                  value={form.instructions}
+                  onChange={setField('instructions')}
+                  className="w-full border border-[#dadada] px-3 py-2 outline-none focus:ring-1 focus:ring-[#B83439]"
+                  placeholder="Please enter any delivery instructions"
+                />
+              </div>
+
+              {/* Address */}
+              <h4 className="text-[18px] font-semibold mb-3">Address</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className="text-xs block mb-2">Street Name</label>
+                  <input
+                    value={form.street}
+                    onChange={setField('street')}
+                    className="w-full border border-[#dadada] px-3 py-2 outline-none focus:ring-1 focus:ring-[#B83439]"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs block mb-2">Suburb</label>
+                  <input
+                    value={form.suburb}
+                    onChange={setField('suburb')}
+                    className="w-full border border-[#dadada] px-3 py-2 outline-none focus:ring-1 focus:ring-[#B83439]"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs block mb-2">Street Number</label>
+                  <input
+                    value={form.streetNo}
+                    onChange={setField('streetNo')}
+                    className="w-full border border-[#dadada] px-3 py-2 outline-none focus:ring-1 focus:ring-[#B83439]"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs block mb-2">Suburb</label>
+                  <input
+                    value={form.suburb2}
+                    onChange={setField('suburb2')}
+                    className="w-full border border-[#dadada] px-3 py-2 outline-none focus:ring-1 focus:ring-[#B83439]"
+                  />
+                </div>
+              </div>
+
+              {/* Payment */}
+              <h4 className="text-[18px] font-semibold mb-3">Payment Method</h4>
+              <div className="border-t border-[#dfc8c8] pt-4">
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="radio"
+                    name="pay"
+                    checked={form.payment === 'card'}
+                    onChange={() => setForm((s) => ({ ...s, payment: 'card' }))}
+                  />
+                  Credit / Debit Card
+                </label>
+              </div>
+            </div>
+
+            {/* RIGHT CART */}
+            <aside className="font-['Inter'] text-[#2E2E2E]">
+              <div className="border-t-4 border-[#dfc8c8] pt-2 mb-3">
+                <h4 className="text-[28px] font-['Instrument_Serif']">Cart</h4>
+              </div>
+
+              {/* Items */}
+              <div className="space-y-5">
+                {cart.map((item) => (
+                  <div key={item.id} className="">
+                    <div className="flex items-center justify-between text-sm mb-1">
+                      <span className="font-medium">{item.pizza.name}</span>
+                      <div className="flex items-center gap-1">
                         <button
-                          onClick={() => updateSuggestedQuantity(pizza.id, -1)}
-                          className="w-8 h-8 flex items-center justify-center border border-gray-300 text-sm hover:bg-gray-50"
+                          className="h-6 w-6 border grid place-items-center"
+                          onClick={() => updateQuantity(item.id, Math.max(1, item.quantity - 1))}
                         >
                           <Minus className="h-3 w-3" />
                         </button>
-                        <span className="text-sm">{suggestedQuantities[pizza.id] || 1}</span>
+                        <span className="px-2">{item.quantity}</span>
                         <button
-                          onClick={() => updateSuggestedQuantity(pizza.id, 1)}
-                          className="w-8 h-8 flex items-center justify-center border border-gray-300 text-sm hover:bg-gray-50"
+                          className="h-6 w-6 border grid place-items-center"
+                          onClick={() => updateQuantity(item.id, item.quantity + 1)}
                         >
                           <Plus className="h-3 w-3" />
                         </button>
-                        <button
-                          onClick={() => addSuggestedToCart(pizza)}
-                          className="flex-1 bg-[#8B2635] text-white text-xs py-1.5 rounded hover:bg-[#6d1e29]"
-                        >
-                          Add
-                        </button>
                       </div>
                     </div>
+
+                    {/* Toppings / Adds (if your cart item has these arrays) */}
+                    {item.selectedToppings?.length > 0 && (
+                      <div className="text-xs text-[#666] ml-1">
+                        <p className="leading-5">Toppings</p>
+                        <ul className="list-disc ml-4">
+                          {item.selectedToppings.map((t: any) => (
+                            <li key={t.name}>{t.name}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    <div className="mt-1 flex items-center justify-between text-sm">
+                      <span className="text-[#B83439]">
+                        ${(item.totalPrice ?? 0).toFixed(2)}
+                      </span>
+                      <button
+                        className="text-[#B83439] hover:underline flex items-center gap-1"
+                        onClick={() => removeFromCart(item.id)}
+                      >
+                        <Trash2 className="h-4 w-4" /> Remove
+                      </button>
+                    </div>
+
+                    <div className="h-px bg-[#e9e9e9] mt-3" />
                   </div>
                 ))}
               </div>
-            </div>
-          )}
 
-          <CheckoutForm
-            formData={formData}
-            setFormData={setFormData}
-            errors={errors}
-            setErrors={setErrors}
-            validateForm={validateForm}
-            total={total}
-            cart={cart}
-            clearCart={clearCart}
-            appliedCoupon={appliedCoupon}
-            onApplyCoupon={handleApplyCoupon}
-          />
+              {/* Coupon */}
+              <div className="mt-4">
+                <div className="flex">
+                  <input
+                    placeholder="Enter coupon code"
+                    value={coupon}
+                    onChange={(e) => setCoupon(e.target.value)}
+                    className="flex-1 border border-[#dadada] px-3 py-2 outline-none focus:ring-1 focus:ring-[#B83439]"
+                  />
+                  <button
+                    onClick={applyCoupon}
+                    className="ml-2 px-4 py-2 border border-[#B83439] text-[#B83439] hover:bg-[#B83439] hover:text-white transition"
+                  >
+                    Apply
+                  </button>
+                </div>
+                {couponMsg === 'applied' && (
+                  <p className="text-xs text-green-600 mt-2">Applied Successfully!</p>
+                )}
+                {couponMsg === 'invalid' && (
+                  <p className="text-xs text-red-600 mt-2">Invalid coupon.</p>
+                )}
+              </div>
+
+              {/* Totals */}
+              <div className="mt-6 space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span>Sub Total</span>
+                  <span>${subTotal.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>{method === 'delivery' ? 'Delivery' : 'Pickup'}</span>
+                  <span>${shipFee.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Handling Fee</span>
+                  <span>${handlingFee.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Card Surcharge</span>
+                  <span>${cardSurcharge.toFixed(2)}</span>
+                </div>
+                {discount > 0 && (
+                  <div className="flex justify-between text-[#B83439]">
+                    <span>Coupon</span>
+                    <span>- ${discount.toFixed(2)}</span>
+                  </div>
+                )}
+
+                <div className="h-px bg-[#e9e9e9] my-2" />
+
+                <div className="flex justify-between font-semibold">
+                  <span>Total</span>
+                  <span>${grandTotal.toFixed(2)}</span>
+                </div>
+              </div>
+
+              <button className="mt-4 w-full bg-[#B83439] hover:bg-[#6d1e29] text-white py-3 text-sm font-semibold">
+                Pay Now
+              </button>
+            </aside>
+          </div>
         </div>
-      </div>
+      </main>
 
       <Footer />
     </>
