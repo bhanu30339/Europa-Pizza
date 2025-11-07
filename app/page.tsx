@@ -605,7 +605,7 @@ export default function Home() {
       title="Europa Pizza Location"
       src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3151.799347988959!2d144.9658937756749!3d-37.83243687196737!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x6ad66816fdac92a3%3A0xd3a95a9c2f5a1c0c!2s75%20Dorcas%20St%2C%20South%20Melbourne%20VIC%203205%2C%20Australia!5e0!3m2!1sen!2sau!4v1699288570001!5m2!1sen!2sau"
       className="w-[70%] h-full border-0 rounded-lg shadow-lg"
-      allowFullScreen=""
+      allowFullScreen={true}
       loading="lazy"
       referrerPolicy="no-referrer-when-downgrade"
     ></iframe>
