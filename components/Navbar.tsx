@@ -4,6 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { ShoppingCart, Phone } from 'lucide-react';
 import { useCart } from '@/lib/cart-context';
+import Logo from '../public/assets/TARATOR TM_LOGO-1.png';
 
 export function Navbar() {
   const { cartCount } = useCart();
@@ -17,20 +18,25 @@ export function Navbar() {
           <div className="flex items-center space-x-10">
             {/* Logo and Brand */}
             <div className="flex items-center space-x-3">
-              <span className="text-2xl font-extrabold text-white uppercase tracking-wide">
-                EUROPA
-              </span>
-              <Image
-                src="/assets/logo.png"
-                alt="Europa Pizza Logo"
-                width={40}
-                height={40}
-                className="rounded-full"
-              />
-              <span className="text-2xl font-extrabold text-white uppercase tracking-wide">
-                PIZZA
-              </span>
-            </div>
+  <span className="text-2xl font-extrabold text-white uppercase tracking-wide">
+    EUROPA
+  </span>
+
+  <Link href="/" aria-label="Go to home" className="cursor-pointer">
+    <Image
+      src={Logo}
+      alt="Europa Pizza Logo"
+      width={60}
+      height={50}
+      className="rounded-full"
+      priority
+    />
+  </Link>
+
+  <span className="text-2xl font-extrabold text-white uppercase tracking-wide">
+    PIZZA
+  </span>
+</div>
 
             {/* Navigation Links */}
             <div className="flex items-center space-x-8">

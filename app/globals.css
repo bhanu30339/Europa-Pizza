@@ -166,3 +166,22 @@
 p, span, a, li, label, input, button, textarea, small, div {
     font-family: "Instrument Sans", sans-serif;
 }
+.instrument-serif {
+    font-family: "Instrument Serif", serif;
+}
+html, body, #__next {
+  width: 100%;
+  overflow-x: hidden;
+}
+@keyframes zoom-slow {
+  0% {
+    transform: scale(1);
+  }
+  100% {
+    transform: scale(1.15);
+  }
+}
+
+/* .animate-zoom-slow {
+  animation: zoom-slow 12s ease-in-out infinite alternate;
+} */
