@@ -27,7 +27,7 @@ export default function Home() {
         setPizzas(menuData.pizzas || []);
         setCategories(catData.categories || []);
 
-        const traditionalCat = (catData.categories || []).find((c: Category) => c.slug === 'traditional');
+        const traditionalCat = (catData.categories || []).find((c: Category) => c.name.toLowerCase() === 'traditional');
         if (traditionalCat) {
           setActiveTab(traditionalCat.id);
         }
@@ -58,7 +58,7 @@ export default function Home() {
     setTestimonialIndex((prev) => (prev - 1 + testimonials.length) % testimonials.length);
   };
 
-  const homeCategories = categories.filter(c => ['traditional', 'signature'].includes(c.slug));
+  const homeCategories = categories.filter(c => ['traditional', 'signature'].includes(c.name.toLowerCase()));
   const displayPizzas = pizzas.filter(p => p.category_id === activeTab).slice(0, 8);
 
   return (

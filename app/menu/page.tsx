@@ -25,15 +25,26 @@ export default function MenuPage() {
   useEffect(() => {
     async function fetchData() {
       try {
+        console.log('Fetching menu data...');
         const [menuRes, catRes] = await Promise.all([
           fetch('/api/menu'),
           fetch('/api/categories'),
         ]);
+
+        console.log('Menu response status:', menuRes.status);
+        console.log('Categories response status:', catRes.status);
+
         const menuData = await menuRes.json();
         const catData = await catRes.json();
 
+        console.log('Menu data:', menuData);
+        console.log('Categories data:', catData);
+
         const fetchedPizzas = menuData.pizzas || [];
         const fetchedCategories = catData.categories || [];
+
+        console.log('Fetched pizzas count:', fetchedPizzas.length);
+        console.log('Fetched categories count:', fetchedCategories.length);
 
         setPizzas(fetchedPizzas);
         setCategories(fetchedCategories);
@@ -52,6 +63,7 @@ export default function MenuPage() {
         setSelectedSizes(initialSizes);
       } catch (error) {
         console.error('Failed to fetch data:', error);
+        toast.error('Failed to load menu data');
       }
     }
     fetchData();
